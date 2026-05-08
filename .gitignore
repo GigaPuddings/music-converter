@@ -1,0 +1,16 @@
+node_modules/
+build/
+dist/
+
+*.log
+*.zip
+
+tmp-*/
+unlock-cli-v*/
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db

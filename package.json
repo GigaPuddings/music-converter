@@ -1,0 +1,111 @@
+{
+  "name": "music-converter",
+  "version": "1.0.0",
+  "main": "electron/main.js",
+  "homepage": "./",
+  "scripts": {
+    "start": "set BROWSER=none&& react-scripts start",
+    "electron": "electron .",
+    "electron:debug-kgg": "set MUSIC_CONVERTER_DEBUG_KGG=1&& set MUSIC_CONVERTER_KGG_LOG=kgg-debug.log&& electron .",
+    "electron:dev": "set ELECTRON_START_URL=http://localhost:3000&& electron .",
+    "build": "react-scripts build",
+    "app": "pnpm build && pnpm electron",
+    "prepack:win": "node scripts/ensure-pwd-shim.cjs",
+    "dist": "pnpm prepack:win && pnpm build && node scripts/electron-builder-win.cjs --win",
+    "dist:dir": "pnpm prepack:win && pnpm build && node scripts/electron-builder-win.cjs --win --dir",
+    "dist:portable": "pnpm prepack:win && pnpm build && node scripts/electron-builder-win.cjs --win portable",
+    "dist:installer": "pnpm prepack:win && pnpm build && node scripts/electron-builder-win.cjs --win nsis"
+  },
+  "author": "",
+  "license": "ISC",
+  "keywords": [],
+  "description": "Local music format converter for Windows.",
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^41.5.0",
+    "electron-builder": "^26.8.1",
+    "ffmpeg-static": "^5.3.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "react-scripts": "^5.0.1"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "ffmpeg-static"
+    ]
+  },
+  "build": {
+    "extends": null,
+    "appId": "com.local.musicconverter",
+    "productName": "Music Converter",
+    "copyright": "Copyright (c) 2026 Music Converter",
+    "directories": {
+      "output": "dist",
+      "buildResources": "public"
+    },
+    "files": [
+      "build/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "node_modules/ffmpeg-static/ffmpeg.exe",
+        "to": "ffmpeg/ffmpeg.exe"
+      },
+      {
+        "from": "node_modules/ffmpeg-static/ffmpeg.exe.LICENSE",
+        "to": "ffmpeg/ffmpeg.exe.LICENSE"
+      },
+      {
+        "from": "node_modules/ffmpeg-static/ffmpeg.exe.README",
+        "to": "ffmpeg/ffmpeg.exe.README"
+      }
+    ],
+    "asar": true,
+    "npmRebuild": false,
+    "win": {
+      "icon": "icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "forceCodeSigning": false
+    },
+    "nsis": {
+      "artifactName": "${productName}-${version}-${arch}-setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "perMachine": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Music Converter"
+    },
+    "portable": {
+      "artifactName": "${productName}-${version}-${arch}-portable.${ext}"
+    }
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
+}
