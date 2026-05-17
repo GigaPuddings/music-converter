@@ -1,0 +1,10 @@
+{
+  "id": "kugou-unlocker",
+  "name": "Kugou Unlocker",
+  "version": "1.0.0",
+  "description": "Preprocesses supported local Kugou containers before FFmpeg conversion.",
+  "author": "Music Converter",
+  "extensions": ["kgg", "kgm", "kgma", "vpr"],
+  "entry": "main.js",
+  "defaultEnabled": true
+}

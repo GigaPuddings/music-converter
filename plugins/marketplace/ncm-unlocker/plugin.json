@@ -1,0 +1,10 @@
+{
+  "id": "ncm-unlocker",
+  "name": "NCM Unlocker",
+  "version": "1.0.0",
+  "description": "Preprocesses local .ncm files into ordinary audio files before FFmpeg conversion.",
+  "author": "Music Converter",
+  "extensions": ["ncm"],
+  "entry": "main.js",
+  "defaultEnabled": true
+}
