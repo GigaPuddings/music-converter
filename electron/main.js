@@ -3,8 +3,10 @@ const path = require("path");
 const fs = require("fs");
 const { spawn } = require("child_process");
 const os = require("os");
-const { decodeKugouFile } = require("./kugou-decrypt");
-const { decodeNcmFile } = require("./ncm-decrypt");
+const {
+  PREPROCESS_INPUTS,
+  decodeWithPreprocessor,
+} = require("./preprocessors");
 
 let mainWindow;
 const runningJobs = new Map();
@@ -23,14 +25,6 @@ const SUPPORTED_INPUTS = new Set([
   ".wav",
   ".webm",
   ".wma",
-]);
-
-const PREPROCESS_INPUTS = new Set([
-  ".ncm",
-  ".kgg",
-  ".kgm",
-  ".kgma",
-  ".vpr",
 ]);
 
 const BLOCKED_ENCRYPTED_INPUTS = new Set([
@@ -440,14 +434,11 @@ async function preprocessEncryptedFile(job) {
     message: "正在解锁加密音频...",
   });
 
-  const ext = path.extname(job.path).toLowerCase();
-  const decodedPath = ext === ".ncm"
-    ? decodeNcmFile(job.path, tempDirectory)
-    : decodeKugouFile(job.path, tempDirectory);
+  const { decodedPath, preprocessor } = decodeWithPreprocessor(job.path, tempDirectory);
 
   if (!decodedPath) {
     removeDirectoryQuietly(tempDirectory);
-    throw new Error("纯 JS 解锁器未生成可转码的音频文件。");
+    throw new Error(`${preprocessor.name} 未生成可转码的音频文件。`);
   }
 
   emitJobUpdate(job.id, {

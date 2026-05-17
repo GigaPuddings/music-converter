@@ -20,6 +20,17 @@ This tool is intended for local files you have the right to process. Some propri
 
 NCM and supported Kugou formats are decoded locally before being passed to FFmpeg for conversion.
 
+## Preprocessor Plugins
+
+Encrypted-format preprocessing is registered in `electron/preprocessors/index.js`.
+
+Current preprocessors:
+
+- NCM: `.ncm`
+- Kugou: `.kgg`, `.kgm`, `.kgma`, `.vpr`
+
+To add another encrypted container, implement a decoder that writes a normal audio file into the provided temporary output directory, then register it with its extensions in the preprocessor registry.
+
 ## Development
 
 ```bash
