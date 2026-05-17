@@ -20,41 +20,16 @@ This tool is intended for local files you have the right to process. Some propri
 
 NCM and supported Kugou formats are decoded locally before being passed to FFmpeg for conversion.
 
-## External Preprocessor Plugins
+## Preprocessor Plugins
 
-Encrypted-format preprocessing is loaded through a runtime plugin manager.
+Encrypted-format preprocessing is registered in `electron/preprocessors/index.js`.
 
-Plugin sources:
+Current preprocessors:
 
-- Built-in marketplace packages live in `plugins/marketplace/`.
-- Installed and third-party plugins live in the app data `plugins` directory, which can be opened from the app sidebar.
-- The app scans enabled plugins dynamically and dispatches preprocessing by file extension.
+- NCM: `.ncm`
+- Kugou: `.kgg`, `.kgm`, `.kgma`, `.vpr`
 
-Each plugin is a folder with `plugin.json` and an entry file:
-
-```json
-{
-  "id": "example-unlocker",
-  "name": "Example Unlocker",
-  "version": "1.0.0",
-  "description": "Preprocesses .example files before conversion.",
-  "extensions": ["example"],
-  "entry": "main.js"
-}
-```
-
-The entry file must export `decode` or `decodeFile`:
-
-```js
-function decode({ inputPath, outputDirectory, pluginDirectory }) {
-  // Write a normal audio file into outputDirectory and return its path.
-  return "C:\\path\\to\\decoded.wav";
-}
-
-module.exports = { decode };
-```
-
-External plugins run in the local Electron main-process Node environment. Install only plugins from sources you trust.
+To add another encrypted container, implement a decoder that writes a normal audio file into the provided temporary output directory, then register it with its extensions in the preprocessor registry.
 
 ## Development
 

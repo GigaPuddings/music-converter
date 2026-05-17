@@ -47,7 +47,6 @@
     "files": [
       "build/**/*",
       "electron/**/*",
-      "plugins/marketplace/**/*",
       "package.json"
     ],
     "extraResources": [

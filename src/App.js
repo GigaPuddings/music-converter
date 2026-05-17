@@ -27,6 +27,7 @@ const SUPPORTED_INPUT_FORMATS = [
   "ALAC",
   "WEBM",
 ];
+const PREPROCESS_FORMATS = ["NCM", "KGG", "KGM", "KGMA", "VPR"];
 const TERMINAL_STATUSES = new Set(["done", "failed", "cancelled"]);
 
 function getBatchJobProgress(job) {
@@ -58,14 +59,8 @@ function App() {
   const [isConverting, setIsConverting] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [notice, setNotice] = useState("");
-  const [pluginCatalog, setPluginCatalog] = useState({ plugins: [], userPluginDirectory: "" });
   const [activeBatch, setActiveBatch] = useState({ ids: [], total: 0 });
   const conversionRef = useRef(false);
-
-  const refreshPlugins = useCallback(async () => {
-    if (!window.musicConverter?.listPlugins) return;
-    setPluginCatalog(await window.musicConverter.listPlugins());
-  }, []);
 
   useEffect(() => {
     if (!window.musicConverter) return undefined;
@@ -73,7 +68,6 @@ function App() {
     window.musicConverter.getDefaults().then((defaults) => {
       if (defaults?.outputDirectory) setOutputDirectory(defaults.outputDirectory);
     });
-    refreshPlugins();
 
     const removeConversionListener = window.musicConverter.onConversionUpdate((update) => {
       setJobs((current) =>
@@ -82,7 +76,7 @@ function App() {
     });
 
     return () => removeConversionListener?.();
-  }, [refreshPlugins]);
+  }, []);
 
   const startConversion = useCallback(
     async (jobSource = jobs) => {
@@ -198,19 +192,6 @@ function App() {
     return { total, convertible, done, failed, cancelled, running, pending };
   }, [jobs]);
 
-  const pluginStats = useMemo(() => {
-    const plugins = pluginCatalog.plugins || [];
-    const active = plugins.filter((plugin) => plugin.active);
-    const extensions = [
-      ...new Set(active.flatMap((plugin) => plugin.extensions || []).map((extension) => extension.toUpperCase())),
-    ].sort();
-    return {
-      installed: plugins.filter((plugin) => plugin.installed).length,
-      active: active.length,
-      extensions,
-    };
-  }, [pluginCatalog]);
-
   const batchProgress = useMemo(() => {
     const batchJobs = activeBatch.ids
       .map((id) => jobs.find((job) => job.id === id))
@@ -266,51 +247,6 @@ function App() {
       if (selected) setOutputDirectory(selected);
     } catch (error) {
       setNotice(error.message || "选择输出目录失败。");
-    }
-  }
-
-  async function installPlugin(id) {
-    try {
-      setPluginCatalog(await window.musicConverter.installPlugin(id));
-      setNotice("插件已安装。重新导入文件后会按新插件识别格式。");
-    } catch (error) {
-      setNotice(error.message || "安装插件失败。");
-    }
-  }
-
-  async function uninstallPlugin(id) {
-    try {
-      setPluginCatalog(await window.musicConverter.uninstallPlugin(id));
-      setNotice("插件已卸载。");
-    } catch (error) {
-      setNotice(error.message || "卸载插件失败。");
-    }
-  }
-
-  async function togglePlugin(id, enabled) {
-    try {
-      setPluginCatalog(await window.musicConverter.setPluginEnabled(id, enabled));
-      setNotice(enabled ? "插件已启用。" : "插件已停用。");
-    } catch (error) {
-      setNotice(error.message || "切换插件状态失败。");
-    }
-  }
-
-  async function reloadPlugins() {
-    try {
-      setPluginCatalog(await window.musicConverter.reloadPlugins());
-      setNotice("插件已重载。");
-    } catch (error) {
-      setNotice(error.message || "重载插件失败。");
-    }
-  }
-
-  async function openPluginDirectory() {
-    try {
-      const directory = await window.musicConverter.openPluginDirectory();
-      setNotice(`插件目录：${directory}`);
-    } catch (error) {
-      setNotice(error.message || "打开插件目录失败。");
     }
   }
 
@@ -549,67 +485,12 @@ function App() {
           <p>默认输出到桌面，也可以手动指定保存位置。批量转换会按队列顺序执行，窗口会实时刷新当前任务与总进度。</p>
           <div className="side-card">
             <strong>支持转换</strong>
-            <span>
-              {SUPPORTED_INPUT_FORMATS.join("、")} 可转为{" "}
-              {OUTPUT_FORMATS.map((format) => format.toUpperCase()).join("、")}。
-            </span>
-          </div>
-          <div className="plugin-panel">
-            <div className="plugin-panel__header">
-              <div>
-                <h3>插件市场</h3>
-                <p>
-                  已安装 {pluginStats.installed} 个，启用 {pluginStats.active} 个
-                  {pluginStats.extensions.length ? `，扩展 ${pluginStats.extensions.join("、")}` : ""}。
-                </p>
-              </div>
-              <button className="ghost" type="button" onClick={reloadPlugins}>
-                重载
-              </button>
-            </div>
-            <div className="plugin-list">
-              {(pluginCatalog.plugins || []).map((plugin) => (
-                <article className={`plugin-item ${plugin.active ? "active" : ""}`} key={plugin.id}>
-                  <div>
-                    <strong>{plugin.name}</strong>
-                    <span>
-                      {plugin.version} · {plugin.source === "marketplace" ? "市场" : "外部"}
-                    </span>
-                  </div>
-                  <p>{plugin.description || `${plugin.extensions.join("、").toUpperCase()} 预处理插件`}</p>
-                  {plugin.error ? <p className="plugin-error">{plugin.error}</p> : null}
-                  <small>{plugin.extensions.map((extension) => extension.toUpperCase()).join("、")}</small>
-                  <div className="plugin-actions">
-                    {plugin.installed ? (
-                      <button
-                        className="ghost"
-                        type="button"
-                        onClick={() => togglePlugin(plugin.id, !plugin.enabled)}
-                      >
-                        {plugin.enabled ? "停用" : "启用"}
-                      </button>
-                    ) : (
-                      <button className="secondary" type="button" onClick={() => installPlugin(plugin.id)}>
-                        安装
-                      </button>
-                    )}
-                    {plugin.source === "marketplace" && plugin.installed ? (
-                      <button className="ghost" type="button" onClick={() => uninstallPlugin(plugin.id)}>
-                        卸载
-                      </button>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-            <button className="secondary plugin-directory" type="button" onClick={openPluginDirectory}>
-              打开外部插件目录
-            </button>
+            <span>{SUPPORTED_INPUT_FORMATS.join("、")} 可转为 {OUTPUT_FORMATS.map((format) => format.toUpperCase()).join("、")}。</span>
           </div>
           <div className="source-note">
             <strong>处理边界</strong>
             <span>
-              本应用仅处理你有权转换的本地文件。外部插件会在本机 Node 环境中执行，请只安装可信来源。
+              本应用仅处理你有权转换的本地未加密音频文件，不包含任何解密或规避访问控制的逻辑。
             </span>
           </div>
         </aside>

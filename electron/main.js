@@ -4,14 +4,8 @@ const fs = require("fs");
 const { spawn } = require("child_process");
 const os = require("os");
 const {
+  PREPROCESS_INPUTS,
   decodeWithPreprocessor,
-  getPluginCatalog,
-  getPreprocessExtensions,
-  initializePreprocessors,
-  installMarketplacePlugin,
-  reloadPreprocessors,
-  setPluginEnabled,
-  uninstallMarketplacePlugin,
 } = require("./preprocessors");
 
 let mainWindow;
@@ -177,6 +171,21 @@ function collectAudioFiles(inputPath, collected = []) {
   return collected;
 }
 
+function collectFiles(inputPath, collected = []) {
+  if (!inputPath || !fs.existsSync(inputPath)) return collected;
+
+  const stat = fs.statSync(inputPath);
+  if (stat.isDirectory()) {
+    for (const entry of fs.readdirSync(inputPath)) {
+      collectFiles(path.join(inputPath, entry), collected);
+    }
+    return collected;
+  }
+
+  collected.push(inputPath);
+  return collected;
+}
+
 function removeDirectoryQuietly(directory) {
   if (!directory) return;
   try {
@@ -207,7 +216,6 @@ function uniqueOutputPath(outputDirectory, inputPath, format) {
 
 function classifyFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  const preprocessInputs = getPreprocessExtensions();
   const exists = fs.existsSync(filePath);
   const stat = exists ? fs.statSync(filePath) : null;
   const baseJob = {
@@ -235,7 +243,7 @@ function classifyFile(filePath) {
     };
   }
 
-  if (preprocessInputs.has(ext)) {
+  if (PREPROCESS_INPUTS.has(ext)) {
     return {
       ...baseJob,
       status: "ready",
@@ -299,7 +307,7 @@ async function convertFile(job, options) {
   let finalJob = job;
 
   try {
-    if (getPreprocessExtensions().has(path.extname(job.path).toLowerCase())) {
+    if (PREPROCESS_INPUTS.has(path.extname(job.path).toLowerCase())) {
       const preprocessResult = await preprocessEncryptedFile(job);
       inputPath = preprocessResult.inputPath;
       tempDirectory = preprocessResult.tempDirectory;
@@ -404,6 +412,19 @@ async function convertFile(job, options) {
   return finalJob;
 }
 
+function selectDecodedFile(tempDirectory) {
+  const files = collectFiles(tempDirectory)
+    .filter((filePath) => {
+      const ext = path.extname(filePath).toLowerCase();
+      return SUPPORTED_INPUTS.has(ext) && !PREPROCESS_INPUTS.has(ext);
+    })
+    .map((filePath) => ({ filePath, stat: fs.statSync(filePath) }))
+    .filter((entry) => entry.stat.isFile() && entry.stat.size > 0)
+    .sort((a, b) => b.stat.mtimeMs - a.stat.mtimeMs || b.stat.size - a.stat.size);
+
+  return files[0]?.filePath || "";
+}
+
 async function preprocessEncryptedFile(job) {
   const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "music-converter-"));
 
@@ -413,7 +434,7 @@ async function preprocessEncryptedFile(job) {
     message: "正在解锁加密音频...",
   });
 
-  const { decodedPath, preprocessor } = await decodeWithPreprocessor(job.path, tempDirectory);
+  const { decodedPath, preprocessor } = decodeWithPreprocessor(job.path, tempDirectory);
 
   if (!decodedPath) {
     removeDirectoryQuietly(tempDirectory);
@@ -428,38 +449,9 @@ async function preprocessEncryptedFile(job) {
   return { inputPath: decodedPath, tempDirectory };
 }
 
-function getOpenDialogAudioExtensions() {
-  return [
-    ...SUPPORTED_INPUTS,
-    ...getPreprocessExtensions(),
-    ...BLOCKED_ENCRYPTED_INPUTS,
-  ]
-    .map((extension) => extension.replace(/^\./, ""))
-    .sort();
-}
-
 ipcMain.handle("app:get-defaults", async () => ({
   outputDirectory: app.getPath("desktop"),
 }));
-
-ipcMain.handle("plugins:list", async () => getPluginCatalog());
-
-ipcMain.handle("plugins:reload", async () => reloadPreprocessors());
-
-ipcMain.handle("plugins:install", async (_event, id) => installMarketplacePlugin(id));
-
-ipcMain.handle("plugins:uninstall", async (_event, id) => uninstallMarketplacePlugin(id));
-
-ipcMain.handle("plugins:set-enabled", async (_event, payload) =>
-  setPluginEnabled(payload?.id, Boolean(payload?.enabled))
-);
-
-ipcMain.handle("plugins:open-directory", async () => {
-  const { userPluginDirectory } = getPluginCatalog();
-  fs.mkdirSync(userPluginDirectory, { recursive: true });
-  await shell.openPath(userPluginDirectory);
-  return userPluginDirectory;
-});
 
 ipcMain.handle("paths:classify", async (_event, paths) => {
   return classifyPaths(Array.isArray(paths) ? paths : []);
@@ -493,7 +485,25 @@ ipcMain.handle("files:select", async () => {
     filters: [
       {
         name: "音频文件",
-        extensions: getOpenDialogAudioExtensions(),
+        extensions: [
+          "flac",
+          "wav",
+          "m4a",
+          "aac",
+          "ogg",
+          "opus",
+          "wma",
+          "ape",
+          "aiff",
+          "mp3",
+          "ncm",
+          "kgg",
+          "kgm",
+          "kgma",
+          "vpr",
+          "kwm",
+          "mflac",
+        ],
       },
     ],
   });
@@ -555,10 +565,7 @@ ipcMain.handle("shell:show-item", async (_event, filePath) => {
   }
 });
 
-app.whenReady().then(() => {
-  initializePreprocessors(app);
-  createWindow();
-});
+app.whenReady().then(createWindow);
 
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") app.quit();
